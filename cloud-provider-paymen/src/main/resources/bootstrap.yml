@@ -42,7 +42,7 @@ spring:
         ## group: DEFAULT_GROUP
         ## 命名空间 默认为 public
         namespace: hzqserver
-        shared-configs: base.yaml,datasource.yaml
+        shared-configs: base.yaml,datasource.yaml,minio.yaml
         username: nacos
         password: nacos
 
