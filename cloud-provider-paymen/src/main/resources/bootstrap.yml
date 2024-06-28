@@ -14,13 +14,13 @@ spring:
     # 环境配置
     active: dev
 
-#  datasource:
-#    type: com.alibaba.druid.pool.DruidDataSource
-#    driverClassName: com.mysql.cj.jdbc.Driver
-#    druid:
-#      url: jdbc:mysql://localhost:3306/hzqserver_cloud?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
-#      username: root
-#      password: root
+  #  datasource:
+  #    type: com.alibaba.druid.pool.DruidDataSource
+  #    driverClassName: com.mysql.cj.jdbc.Driver
+  #    druid:
+  #      url: jdbc:mysql://localhost:3306/hzqserver_cloud?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=true&serverTimezone=GMT%2B8
+  #      username: root
+  #      password: root
 
   cloud:
     loadbalancer:
@@ -30,8 +30,10 @@ spring:
       discovery:
         # 配置 nacos 的服务地址
         server-addr: 127.0.0.1:8848
-        username: nacos
-        password: nacos
+#        username: nacos
+#        password: nacos
+        username: ENC(h4QFZfOnY72PPSKW7P2Gnw==)
+        password: ENC(t3ba4gqc2b+qG1o+j1vXDQ==)
         namespace: hzqserver
       config:
         ## nacos 作为配置中心地址
@@ -43,8 +45,20 @@ spring:
         ## 命名空间 默认为 public
         namespace: hzqserver
         shared-configs: base.yaml,datasource.yaml,minio.yaml
-        username: nacos
-        password: nacos
+#        username: nacos
+#        password: nacos
+        username: ENC(h4QFZfOnY72PPSKW7P2Gnw==)
+        password: ENC(t3ba4gqc2b+qG1o+j1vXDQ==)
+
+# 加密配置 3版本后需要指定加密算法和类型
+jasypt:
+  encryptor:
+    # 指定加密密钥，生产环境请放到启动参数里面
+    password: csp
+    # 指定解密算法，需要和加密时使用的算法一致
+    algorithm: PBEWithMD5AndDES
+    # 指定initialization vector类型
+    iv-generator-classname: org.jasypt.iv.NoIvGenerator
 
 #  #mybatis:
 #  #配置mapper的扫描，找到所有的mapper:xml映射文件:
