@@ -315,7 +315,7 @@ public class AwsFileUploadServiceImpl implements AwsFileUploadService {
      * @param objectKey
      */
     @Override
-    public void downloadBigFile(String objectKey) {
+    public void downloadBigFile(String objectKey) throws IOException {
         String fileName = "";
         if (objectKey.lastIndexOf("/") > 0) {
             fileName = objectKey.substring(objectKey.lastIndexOf("/") + 1);
@@ -331,7 +331,19 @@ public class AwsFileUploadServiceImpl implements AwsFileUploadService {
         // 判断是否需要分片下载
         if (objectSize <= partSize) {
             //正常下载
-
+            S3ObjectInputStream objectContent = amazonS3Client.getObject(bucketName, objectKey).getObjectContent();
+            //临时存储分片文件
+            FileOutputStream fos = new FileOutputStream(down_path + File.separator + fileName);
+            // 定义缓冲区
+            byte[] buffer = new byte[1024];
+            int readLength;
+            //写文件
+            while ((readLength = objectContent.read(buffer)) != -1) {
+                fos.write(buffer, 0, readLength);
+            }
+            objectContent.close();
+            fos.flush();
+            fos.close();
         } else {
             long pages = objectSize / partSize;
             System.out.println("文件分页个数:" + pages + "， 文件大小：" + objectSize);

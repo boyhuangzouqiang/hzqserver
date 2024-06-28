@@ -3,9 +3,7 @@ package com.paymen.service.s3;
 import com.amazonaws.services.s3.model.CompleteMultipartUploadResult;
 import com.amazonaws.services.s3.model.PutObjectResult;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.InputStream;
+import java.io.*;
 import java.net.URL;
 
 /**
@@ -153,7 +151,7 @@ public interface AwsFileUploadService {
      *
      * @param key
      */
-    void downloadBigFile(String key);
+    void downloadBigFile(String key) throws IOException;
 }
 
 
