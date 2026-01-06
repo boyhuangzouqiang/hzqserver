@@ -12,6 +12,8 @@
         <module>cloud-common</module>
         <module>cloud-provider-paymen</module>
         <module>cloud-gateway</module>
+        <module>cloud-auth-service</module>
+        <module>cloud-typemq</module>
     </modules>
 
     <properties>
@@ -182,7 +184,6 @@
                 <configuration>
                     <source>${java.version}</source>
                     <target>${java.version}</target>
-                    <release>8</release>
                     <encoding>${project.build.sourceEncoding}</encoding>
                 </configuration>
             </plugin>

@@ -1,0 +1,33 @@
+server:
+  port: 8089
+
+spring:
+  application:
+    name: authservice
+
+
+  cloud:
+    loadbalancer:
+      nacos:
+        enabled: true
+    nacos:
+      discovery:
+        # 配置 nacos 的服务地址
+        server-addr: 127.0.0.1:8848
+#        username: nacos
+#        password: nacos
+        namespace: hzqserver
+      config:
+        ## nacos 作为配置中心地址
+        server-addr: ${spring.cloud.nacos.discovery.server-addr}
+        ## 指定yaml格式的配置，默认为：properties
+        file-extension: yaml
+        ## 分组 默认为：DEFAULT_GROUP
+        ## group: DEFAULT_GROUP
+        ## 命名空间 默认为 public
+        namespace: hzqserver
+        shared-configs: base.yaml,datasource.yaml
+#        username: nacos
+#        password: nacos
+
+
