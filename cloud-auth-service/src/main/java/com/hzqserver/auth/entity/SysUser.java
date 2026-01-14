@@ -1,35 +1,46 @@
 package com.hzqserver.auth.entity;
 
-import javax.persistence.*;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.experimental.Accessors;
+
 import java.time.LocalDateTime;
 
 /**
- * 系统用户实体类
- * 对应数据库中的sys_user表，存储用户的基本信息
+ * 用户实体类
  */
-@Entity
-@Table(name = "sys_user")
 @Data
+@EqualsAndHashCode(callSuper = false)
+@Accessors(chain = true)
+@TableName("sys_user")
 public class SysUser {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    
+    @TableId(value = "id", type = IdType.AUTO)
+    @TableField(value = "id")
     private Long id;
     
-    @Column(unique = true, nullable = false)
+    @TableField(value = "username")
     private String username;
     
-    @Column(nullable = false)
+    @TableField(value = "password")
     private String password;
     
+    @TableField(value = "email")
     private String email;
     
+    @TableField(value = "phone")
     private String phone;
     
-    @Column(columnDefinition = "TINYINT")
-    private Integer status = 1;
+    @TableField(value = "status")
+    private Integer status = 1; // 0-禁用, 1-启用
     
+    @TableField(value = "created_time")
     private LocalDateTime createdTime;
     
+    @TableField(value = "updated_time")
     private LocalDateTime updatedTime;
 }

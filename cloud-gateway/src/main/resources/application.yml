@@ -19,3 +19,9 @@ spring:
           uri: lb://paymentservice # 匹配提供服务的路由地址
           predicates: # 断言
             - Path=/paymentservice/** # 断言，路径相匹配进行路由
+        - id: authservice #路由ID，路由到认证服务
+          uri: lb://authservice # 匹配认证服务的路由地址
+          predicates: # 断言
+            - Path=/authservice/** # 断言，路径相匹配进行路由
+          filters:
+            - StripPrefix=1 # 移除第一个路径前缀

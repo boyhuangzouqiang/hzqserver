@@ -1,42 +1,43 @@
 package com.hzqserver.auth.entity;
 
-import javax.persistence.*;
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.experimental.Accessors;
+
 import java.time.LocalDateTime;
-import java.util.List;
 
 /**
- * 系统角色实体类
- * 对应数据库中的sys_role表，存储系统角色信息
+ * 角色实体类
  */
-@Entity
-@Table(name = "sys_role")
 @Data
+@EqualsAndHashCode(callSuper = false)
+@Accessors(chain = true)
+@TableName("sys_role")
 public class SysRole {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    
+    @TableId(value = "id", type = IdType.AUTO)
+    @TableField(value = "id")
     private Long id;
     
-    @Column(unique = true, nullable = false)
+    @TableField(value = "role_name")
     private String roleName;
     
-    @Column(unique = true, nullable = false)
+    @TableField(value = "role_code")
     private String roleCode;
     
+    @TableField(value = "role_desc")
     private String roleDesc;
     
-    @Column(columnDefinition = "TINYINT")
+    @TableField(value = "status")
     private Integer status = 1;
     
+    @TableField(value = "created_time")
     private LocalDateTime createdTime;
     
+    @TableField(value = "updated_time")
     private LocalDateTime updatedTime;
-    
-    @ManyToMany
-    @JoinTable(
-        name = "sys_role_permission",
-        joinColumns = @JoinColumn(name = "role_id"),
-        inverseJoinColumns = @JoinColumn(name = "permission_id")
-    )
-    private List<SysPermission> permissions;
 }

@@ -1,39 +1,40 @@
 package com.hzqserver.auth.entity;
 
-import javax.persistence.*;
+import com.baomidou.mybatisplus.annotation.TableField;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
+import lombok.ToString;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * 系统权限实体类
- * 对应数据库中的sys_permission表，存储系统权限信息
+ * 权限实体类
  */
-@Entity
-@Table(name = "sys_permission")
 @Data
-public class SysPermission {
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+@TableName("sys_permission")
+@ToString(callSuper = true)
+@EqualsAndHashCode(callSuper = true)
+public class SysPermission extends BaseEntity {
     
-    @Column(nullable = false)
+    @TableField(value = "permission_name")
     private String permissionName;
     
-    @Column(unique = true, nullable = false)
+    @TableField(value = "permission_code")
     private String permissionCode;
     
+    @TableField(value = "permission_desc")
     private String permissionDesc;
     
+    @TableField(value = "parent_id")
     private Long parentId = 0L;
     
-    @Column(columnDefinition = "TINYINT")
+    @TableField(value = "status")
     private Integer status = 1;
     
-    private LocalDateTime createdTime;
-    
-    private LocalDateTime updatedTime;
-    
-    @ManyToMany(mappedBy = "permissions")
-    private List<SysRole> roles;
+    // 关联角色权限表
+    @TableField(exist = false)
+    private List<SysRolePermission> rolePermissions;
 }

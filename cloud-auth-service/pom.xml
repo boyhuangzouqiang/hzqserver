@@ -36,10 +36,18 @@
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
         
-        <!-- Spring Data JPA -->
+        <!-- MyBatis-Plus -->
         <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-jpa</artifactId>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-boot-starter</artifactId>
+            <version>3.5.2</version>
+        </dependency>
+        
+        <!-- MySQL Driver -->
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <scope>runtime</scope>
         </dependency>
 
         <!-- 引入公共核心模块 -->
@@ -95,11 +103,7 @@
             <optional>true</optional>
         </dependency>
         
-        <!-- JPA API -->
-        <dependency>
-            <groupId>javax.persistence</groupId>
-            <artifactId>javax.persistence-api</artifactId>
-        </dependency>
+
         
         <!-- Google Guava to resolve version conflicts -->
         <dependency>

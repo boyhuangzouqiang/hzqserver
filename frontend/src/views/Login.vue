@@ -151,12 +151,8 @@ export default {
       this.error = '';
       
       try {
-        const response = await api.post('/auth/login', null, {
-          params: {
-            username: this.username,
-            password: this.password
-          }
-        });
+        // 使用查询参数而不是请求体，与后端控制器匹配
+        const response = await api.post(`/authservice/auth/login?username=${encodeURIComponent(this.username)}&password=${encodeURIComponent(this.password)}`);
         
         if (response.data.success) {
           // 存储token
@@ -201,7 +197,7 @@ export default {
         if (this.regEmail) userData.email = this.regEmail;
         if (this.regPhone) userData.phone = this.regPhone;
         
-        const response = await api.post('/auth/register', userData);
+        const response = await api.post('/authservice/auth/register', userData);
         
         if (response.data.success) {
           // 注册成功，自动跳转到登录页面

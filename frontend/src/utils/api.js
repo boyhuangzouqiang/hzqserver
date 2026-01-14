@@ -25,8 +25,12 @@ api.interceptors.response.use(
   response => response,
   error => {
     if (error.response && error.response.status === 401) {
-      localStorage.removeItem('token')
-      window.location.href = '/login'
+      // 清除无效的token
+      localStorage.removeItem('token');
+      // 使用路由导航而不是直接跳转
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error)
   }
