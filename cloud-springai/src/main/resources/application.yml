@@ -1,0 +1,35 @@
+spring:
+  application:
+    name: spring-ai-agent
+  # 移除Nacos配置，因为我们没有运行Nacos服务器
+  ai:
+    # 阿里云百炼配置
+    dashscope:
+      api-key: ${DASHSCOPE_API_KEY:sk-22fbacec14f24ccea1078aaf4d145eef}
+      enabled: ${SPRING_AI_DASHSCOPE_ENABLED:true}
+      base-url: https://dashscope.aliyuncs.com/compatible-mode/v1
+      chat:
+        options:
+          model: qwen-plus
+          temperature: 0.7
+    # OpenAI配置（备用）
+    openai:
+      api-key: ${OPENAI_API_KEY:}
+      enabled: ${SPRING_AI_OPENAI_ENABLED:false}
+      chat:
+        options:
+          model: gpt-3.5-turbo
+          temperature: 0.7
+
+# AI服务提供商配置
+ai:
+  provider:
+    type: ${AI_PROVIDER_TYPE:dashscope}  # 可选值: dashscope, openai, local, mock
+    enabled: ${AI_PROVIDER_ENABLED:true}
+
+server:
+  port: 8085
+
+logging:
+  level:
+    com.hzqserver.springai: DEBUG

@@ -7,7 +7,7 @@
       <el-table-column prop="email" label="邮箱" width="180"></el-table-column>
       <el-table-column prop="phone" label="手机号"></el-table-column>
       <el-table-column prop="status" label="状态">
-        <template slot-scope="scope">
+        <template #default="scope">
           <el-tag :type="scope.row.status === 1 ? 'success' : 'danger'">
             {{ scope.row.status === 1 ? '启用' : '禁用' }}
           </el-tag>
@@ -50,6 +50,8 @@
 
 <script>
 import api from '@/utils/api.js';
+// 引入Element Plus组件
+import { ElButton, ElTable, ElTableColumn, ElDialog, ElForm, ElFormItem, ElInput, ElSwitch, ElTag, ElMessage } from 'element-plus';
 
 export default {
   name: 'UserManagement',
@@ -75,7 +77,7 @@ export default {
   methods: {
     async loadUsers() {
       try {
-        const response = await api.get('/api/user/list');
+        const response = await api.get('/authservice/user/list');
         this.users = response.data.data || [];
       } catch (error) {
         console.error('加载用户列表失败:', error);

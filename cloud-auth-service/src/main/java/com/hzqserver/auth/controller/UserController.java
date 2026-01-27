@@ -13,7 +13,7 @@ import java.util.List;
  * 提供用户管理的REST API接口
  */
 @RestController
-@RequestMapping("/api/users")
+@RequestMapping("/user")
 public class UserController {
     
     @Autowired
@@ -24,7 +24,7 @@ public class UserController {
      * 
      * @return 用户列表
      */
-    @GetMapping
+    @GetMapping("/list")
     public ResponseEntity<List<SysUser>> getAllUsers() {
         List<SysUser> users = userService.getAllUsers();
         return ResponseEntity.ok(users);

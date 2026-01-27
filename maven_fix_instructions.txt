@@ -1,0 +1,32 @@
+Maven配置修复说明
+=================
+
+当前Maven配置文件存在错误，导致无法编译项目。
+
+错误信息：
+Non-parseable settings D:\1_java_tool\apache-maven-3.8.1\bin\..\conf\settings.xml: 
+end tag name </maven.compiler.version> must match start tag name <maven.compiler.compilerVersion> 
+from line 297 (position: TEXT seen ...<maven.compiler.compilerVersion>17</maven.compiler.version>... @297:72)
+
+问题说明：
+在Maven的settings.xml文件第297行附近，存在一个XML标签错误。
+错误的配置：<maven.compiler.compilerVersion>17</maven.compiler.version>
+
+修复步骤：
+1. 打开文件：D:\1_java_tool\apache-maven-3.8.1\conf\settings.xml
+2. 定位到第297行附近的代码
+3. 查找：<maven.compiler.compilerVersion>17</maven.compiler.version>
+4. 将其修改为正确的标签名，通常是以下之一：
+   - <maven.compiler.source>17</maven.compiler.source>
+   - <maven.compiler.target>17</maven.compiler.target>
+   或者删除这个不正确的配置项
+
+修复后验证：
+修复完成后，可以在cloud-springai目录下运行以下命令验证：
+mvn clean compile
+
+当前项目状态：
+- 代码已经更新以使用阿里云百炼API（DashScope）
+- 配置文件已更新为使用spring-ai-alibaba-starter-dashscope依赖
+- 所有类和方法都保留了中文注释
+- 一旦Maven配置修复，项目应该能够正常编译并使用百炼API

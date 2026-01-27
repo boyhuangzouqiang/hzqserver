@@ -18,7 +18,7 @@
     </el-menu-item>
 
     <!-- 系统管理下拉菜单 -->
-    <el-sub-menu ref="systemManagementSubmenu" index="system-management" popper-class="no-arrow-submenu" teleported="false">
+    <el-sub-menu ref="systemManagementSubmenu" index="system-management" popper-class="no-arrow-submenu" :teleported="false">
       <template #title>
         <i class="el-icon-setting"></i>
         <span>系统管理</span>

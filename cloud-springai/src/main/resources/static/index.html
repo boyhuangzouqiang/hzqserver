@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring AI 智能体</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        textarea, input[type="text"] {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .response {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-left: 4px solid #007bff;
+            white-space: pre-wrap;
+        }
+        .loading {
+            color: #666;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Spring AI 智能体</h1>
+        
+        <div class="form-group">
+            <label for="message">输入消息:</label>
+            <textarea id="message" rows="4" placeholder="请输入您的问题或消息..."></textarea>
+        </div>
+        
+        <button onclick="sendChat()">发送消息</button>
+        <button onclick="summarizeText()">摘要文本</button>
+        <button onclick="analyzeSentiment()">情感分析</button>
+        
+        <div id="response" class="response" style="display:none;"></div>
+        <div id="loading" class="loading" style="display:none;">正在处理...</div>
+    </div>
+
+    <script>
+        async function sendChat() {
+            const message = document.getElementById('message').value;
+            if (!message.trim()) {
+                alert('请输入消息');
+                return;
+            }
+            
+            showLoading();
+            
+            try {
+                const response = await fetch('http://localhost:8085/api/agent/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ message: message })
+                });
+                
+                const result = await response.text();
+                showResponse(result);
+            } catch (error) {
+                showResponse('错误: ' + error.message);
+            }
+        }
+        
+        async function summarizeText() {
+            const text = document.getElementById('message').value;
+            if (!text.trim()) {
+                alert('请输入要摘要的文本');
+                return;
+            }
+            
+            showLoading();
+            
+            try {
+                const response = await fetch('http://localhost:8085/api/task-agent/summarize', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ text: text })
+                });
+                
+                const result = await response.text();
+                showResponse(result);
+            } catch (error) {
+                showResponse('错误: ' + error.message);
+            }
+        }
+        
+        async function analyzeSentiment() {
+            const text = document.getElementById('message').value;
+            if (!text.trim()) {
+                alert('请输入要分析情感的文本');
+                return;
+            }
+            
+            showLoading();
+            
+            try {
+                const response = await fetch('http://localhost:8085/api/task-agent/sentiment', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ text: text })
+                });
+                
+                const result = await response.text();
+                showResponse(result);
+            } catch (error) {
+                showResponse('错误: ' + error.message);
+            }
+        }
+        
+        function showLoading() {
+            document.getElementById('response').style.display = 'none';
+            document.getElementById('loading').style.display = 'block';
+        }
+        
+        function showResponse(text) {
+            document.getElementById('loading').style.display = 'none';
+            const responseDiv = document.getElementById('response');
+            responseDiv.textContent = text;
+            responseDiv.style.display = 'block';
+        }
+        
+        // 监听回车键发送消息
+        document.getElementById('message').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendChat();
+            }
+        });
+    </script>
+</body>
+</html>

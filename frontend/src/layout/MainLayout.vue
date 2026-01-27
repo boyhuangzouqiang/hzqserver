@@ -19,8 +19,8 @@
             </span>
             <template #dropdown>
               <el-dropdown-menu>
-                <el-dropdown-item>个人中心</el-dropdown-item>
-                <el-dropdown-item @click="logout">退出登录</el-dropdown-item>
+                <el-dropdown-item style="white-space: nowrap;">个人中心</el-dropdown-item>
+                <el-dropdown-item @click="logout" style="white-space: nowrap;">退出登录</el-dropdown-item>
               </el-dropdown-menu>
             </template>
           </el-dropdown>

@@ -146,7 +146,31 @@ export default {
 .dashboard-container {
   padding: 20px;
   background-color: #f5f7fa;
-  min-height: 100vh;
+  min-height: calc(100vh - 60px);
+  /* 确保内容铺满整个可视区域 */
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* 调整统计卡片网格布局 */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+  margin-bottom: 30px;
+  /* 确保卡片高度自适应 */
+  align-items: stretch;
+}
+
+/* 调整图表卡片网格布局 */
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: 20px;
+  margin-bottom: 20px;
+  /* 确保卡片高度自适应 */
+  align-items: stretch;
 }
 
 .welcome-section {

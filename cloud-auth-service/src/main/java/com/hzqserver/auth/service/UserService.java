@@ -134,7 +134,7 @@ public class UserService {
      * @param username 用户名
      * @return 用户对象
      */
-    public Optional<SysUser> findByUsername(String username) {
+    public Optional<SysUser> getUserByUsername(String username) {
         QueryWrapper<SysUser> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("username", username);
         SysUser user = userMapper.selectOne(queryWrapper);

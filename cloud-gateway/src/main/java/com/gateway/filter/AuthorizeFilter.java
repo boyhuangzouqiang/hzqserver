@@ -1,17 +1,20 @@
 package com.gateway.filter;
 
+import com.gateway.util.JwtUtil;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.stereotype.Component;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 /**
- * @description: https://blog.csdn.net/m0_66532138/article/details/136480114
+ * @description: JWT令牌验证全局过滤器
+ * 在网关层验证JWT令牌的有效性，验证通过后将用户信息添加到请求头中传递给下游服务
  * @Order值越小，该过滤器优先级越高，越先执行,请求进入网关会碰到三类过滤器： GatewayFilter，DefaultFilter，GloableFilter,
  * 如果三种过滤器的 order 值一样时，会按照 defaultFilter > 路由过滤器 > GlobalFilter 的顺序执行
  * <p>
@@ -25,22 +28,66 @@ import reactor.core.publisher.Mono;
 @Component
 @Order(-1)
 public class AuthorizeFilter implements GlobalFilter {
+
+    @Autowired
+    private JwtUtil jwtUtil;
+
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
-        //获取请求参数
         ServerHttpRequest request = exchange.getRequest();
-        MultiValueMap<String, String> queryParams = request.getQueryParams();
-        //todo 后期有其他业务场景就可以添加，例如鉴权某个特殊账号之类的
-        String authorization = queryParams.getFirst("authorization");
-        //判断authorization值
-        if ("admin".equals(authorization) || authorization == null) {
-            //放行
+        String token = getTokenFromRequest(request);
+
+        // 如果请求路径是认证相关的，直接放行
+        String path = request.getURI().getPath();
+        if (isAuthPath(path)) {
             return chain.filter(exchange);
         }
-        //拦截
-        //设置状态码  401：未登录
-        exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
-        //拦截请求
-        return exchange.getResponse().setComplete();
+
+        // 如果有token，则验证其有效性
+        if (token != null && !token.isEmpty()) {
+            if (jwtUtil.validateToken(token)) {
+                // 从token中提取用户名，并将其添加到请求头中
+                String username = jwtUtil.getUsernameFromToken(token);
+                ServerHttpRequest mutatedRequest = request.mutate()
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)  // 保留原始token
+                        .header("X-User-Username", username)  // 添加用户名到请求头
+                        .build();
+
+                return chain.filter(exchange.mutate().request(mutatedRequest).build());
+            } else {
+                // token无效，返回401未授权
+                exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+                return exchange.getResponse().setComplete();
+            }
+        } else {
+            // 没有token但需要验证的路径，返回401未授权
+            exchange.getResponse().setStatusCode(HttpStatus.UNAUTHORIZED);
+            return exchange.getResponse().setComplete();
+        }
+    }
+
+    /**
+     * 从请求中提取JWT令牌
+     *
+     * @param request HTTP请求
+     * @return JWT令牌，如果不存在则返回null
+     */
+    private String getTokenFromRequest(ServerHttpRequest request) {
+        String bearerToken = request.getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
+        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+            return bearerToken.substring(7);
+        }
+        return null;
+    }
+
+    /**
+     * 判断是否为认证相关路径，不需要验证token
+     *
+     * @param path 请求路径
+     * @return 是否为认证路径
+     */
+    private boolean isAuthPath(String path) {
+        return path.startsWith("/auth/login") ||
+                path.startsWith("/auth/register");
     }
 }

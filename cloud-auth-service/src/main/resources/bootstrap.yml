@@ -4,8 +4,6 @@ server:
 spring:
   application:
     name: authservice
-
-
   cloud:
     loadbalancer:
       nacos:
@@ -26,8 +24,13 @@ spring:
         ## group: DEFAULT_GROUP
         ## 命名空间 默认为 public
         namespace: hzqserver
-        shared-configs: base.yaml,datasource.yaml
-#        username: nacos
-#        password: nacos
+        shared-configs: datasource.yaml,auth.yaml
+      # 禁用Epoll，使用Nio
+      rpc:
+        use-epoll: false
+    # 添加spring.config.import配置
+  #这是Spring Boot 2.4+版本推荐的配置方式，可以确保Nacos配置被正确加载。这个配置能优先加载nacos配置信息，例如spring.main.allow-bean-definition-overriding=true
+  config:
+    import: nacos:datasource.yaml
 
 

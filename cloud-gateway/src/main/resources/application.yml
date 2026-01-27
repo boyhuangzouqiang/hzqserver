@@ -2,14 +2,27 @@ server:
   port: 9999
 spring:
   application:
-    name: cloud-gateway-service
+    name: gateway
   cloud:
     nacos:
       discovery:
         server-addr: localhost:8848
-        username: nacos
-        password: nacos
+#        username: nacos
+#        password: nacos
         namespace: hzqserver
+      config:
+        ## nacos 作为配置中心地址
+        server-addr: ${spring.cloud.nacos.discovery.server-addr}
+        ## 指定yaml格式的配置，默认为：properties
+        file-extension: yaml
+        ## 分组 默认为：DEFAULT_GROUP
+        ## group: DEFAULT_GROUP
+        ## 命名空间 默认为 public
+        namespace: hzqserver
+        shared-configs: auth.yaml
+  config:
+    import: nacos:datasource.yaml
+
     gateway:
 #      discovery:
 #        locator:
@@ -23,5 +36,11 @@ spring:
           uri: lb://authservice # 匹配认证服务的路由地址
           predicates: # 断言
             - Path=/authservice/** # 断言，路径相匹配进行路由
+          filters:
+            - StripPrefix=1 # 移除第一个路径前缀
+        - id: aiservice #路由ID，路由到AI服务
+          uri: lb://aiservice # 匹配AI服务的路由地址
+          predicates: # 断言
+            - Path=/ai/** # 断言，路径相匹配进行路由
           filters:
             - StripPrefix=1 # 移除第一个路径前缀
