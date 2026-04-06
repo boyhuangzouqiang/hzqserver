@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.hzqserver.file.mapper.FileUploadRecordMapper">
+
+    <resultMap id="BaseResultMap" type="com.hzqserver.file.entity.FileUploadRecord">
+        <id column="id" property="id"/>
+        <result column="file_md5" property="fileMd5"/>
+        <result column="file_name" property="fileName"/>
+        <result column="file_ext" property="fileExt"/>
+        <result column="file_size" property="fileSize"/>
+        <result column="content_type" property="contentType"/>
+        <result column="total_chunks" property="totalChunks"/>
+        <result column="uploaded_chunks" property="uploadedChunks"/>
+        <result column="chunk_size" property="chunkSize"/>
+        <result column="storage_path" property="storagePath"/>
+        <result column="access_url" property="accessUrl"/>
+        <result column="status" property="status"/>
+        <result column="upload_user_id" property="uploadUserId"/>
+        <result column="upload_user_name" property="uploadUserName"/>
+        <result column="create_time" property="createTime"/>
+        <result column="update_time" property="updateTime"/>
+        <result column="deleted" property="deleted"/>
+    </resultMap>
+
+    <select id="selectByFileMd5" resultMap="BaseResultMap">
+        SELECT * FROM file_upload_record 
+        WHERE file_md5 = #{fileMd5} 
+        AND deleted = 0
+        LIMIT 1
+    </select>
+
+</mapper>

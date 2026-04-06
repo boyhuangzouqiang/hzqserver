@@ -1,0 +1,30 @@
+spring:
+  cloud:
+    nacos:
+      discovery:
+        server-addr: 127.0.0.1:8848
+        namespace: public
+        group: DEFAULT_GROUP
+        # 心跳间隔（毫秒）
+        heart-beat-interval: 5000
+        # 心跳超时时间（毫秒）
+        heart-beat-timeout: 15000
+        # IP删除超时时间（毫秒）
+        ip-delete-timeout: 30000
+        # 注册失败时是否抛出异常
+        fail-fast: false
+        # 连接超时时间（毫秒）
+        timeout: 10000
+      config:
+        server-addr: 127.0.0.1:8848
+        namespace: public
+        group: DEFAULT_GROUP
+        file-extension: yml
+        # 配置刷新
+        refresh-enabled: true
+        # 连接超时时间（毫秒）
+        timeout: 10000
+        # 最大重试次数
+        max-retry: 10
+        # 重试时间间隔（毫秒）
+        retry-time: 2000

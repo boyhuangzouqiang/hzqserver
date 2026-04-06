@@ -1,0 +1,88 @@
+server:
+  port: 8084
+  # 配置Tomcat超时时间（单位：毫秒）
+  tomcat:
+    connection-timeout: 3600000  # 连接超时：1小时（3600秒）
+    max-connections: 10000       # 最大连接数
+  # Servlet配置
+  servlet:
+    session:
+      timeout: 3600s  # Session超时：1小时
+
+spring:
+  application:
+    name: cloud-file-service
+  main:
+    allow-bean-definition-overriding: true
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/hzqserver?useUnicode=true&characterEncoding=utf8&zeroDateTimeBehavior=convertToNull&useSSL=false&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true
+    username: root
+    password: huang
+    druid:
+      initial-size: 5
+      min-idle: 5
+      max-active: 20
+      max-wait: 60000
+      time-between-eviction-runs-millis: 60000
+      min-evictable-idle-time-millis: 300000
+      validation-query: SELECT 1
+      test-while-idle: true
+      test-on-borrow: false
+      test-on-return: false
+
+# MyBatis-Plus 配置
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  type-aliases-package: com.hzqserver.file.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+# 统一存储配置（支持MinIO/OSS切换）
+file:
+  storage:
+    # 存储类型：minio 或 oss
+    type: minio
+    # 默认存储桶名称
+    default-bucket: file-upload
+  
+  upload:
+    # 分片大小（5MB）
+    chunk-size: 5242880
+    # 最大文件大小（1GB）
+    max-file-size: 1073741824
+    # 允许的文件类型
+    allowed-types: jpg,jpeg,png,gif,pdf,doc,docx,xls,xlsx,zip,rar,mp4,avi,mov
+
+# MinIO 配置（当 storage.type=minio 时使用）
+minio:
+  endpoint: http://localhost:9000
+  access-key: minioadmin
+  secret-key: minioadmin
+  bucket-name: file-upload
+
+# 阿里云 OSS 配置（当 storage.type=oss 时使用）
+aliyun:
+  oss:
+    # OSS 端点（区域不同端点不同，例如：oss-cn-hangzhou.aliyuncs.com）
+    endpoint: oss-cn-hangzhou.aliyuncs.com
+    # AccessKey ID
+    access-key-id: your-access-key-id
+    # AccessKey Secret
+    access-key-secret: your-access-key-secret
+    # 默认存储桶名称
+    bucket-name: file-upload
+    # 自定义域名（可选，如果配置了CDN或绑定域名，可在此配置）
+    custom-domain:
