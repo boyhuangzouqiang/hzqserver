@@ -102,4 +102,34 @@ public class FileUploadRecord implements Serializable {
      */
     @TableLogic
     private Integer deleted;
+    
+    /**
+     * 删除标识;0-未删除 1-已删除
+     */
+    private Integer deleteFlag;
+    
+    /**
+     * 创建人
+     */
+    private Integer createdBy;
+    
+    /**
+     * 创建日期
+     */
+    private LocalDateTime creationDate;
+    
+    /**
+     * 更新人
+     */
+    private Integer lastUpdatedBy;
+    
+    /**
+     * 更新日期
+     */
+    private LocalDateTime lastUpdateDate;
+    
+    /**
+     * 备注说明
+     */
+    private String remark;
 }

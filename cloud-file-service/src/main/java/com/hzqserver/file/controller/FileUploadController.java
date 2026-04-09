@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -172,11 +173,14 @@ public class FileUploadController {
     }
     
     /**
-     * 下载文件
+     * 下载文件（支持HTTP Range断点续传）
      */
     @GetMapping("/download/{fileMd5}")
-    public void downloadFile(@PathVariable("fileMd5") String fileMd5, HttpServletResponse response) {
+    public void downloadFile(@PathVariable("fileMd5") String fileMd5, 
+                            HttpServletRequest request,
+                            HttpServletResponse response) {
         log.info("下载文件: fileMd5={}", fileMd5);
+        
         try {
             // 查询文件记录
             FileUploadRecord record = fileUploadService.getFileRecordByMd5(fileMd5);
@@ -191,13 +195,41 @@ public class FileUploadController {
             StorageService storageService = storageFactory.getStorageService();
             String bucketName = storageProperties.getDefaultBucket();
             
+            // 获取Range请求头
+            String rangeHeader = request.getHeader("Range");
+            long startByte = 0;
+            long endByte = record.getFileSize() - 1;
+            long contentLength = record.getFileSize();
+            
+            // 解析Range请求
+            if (rangeHeader != null && rangeHeader.startsWith("bytes=")) {
+                String range = rangeHeader.substring(6);
+                String[] ranges = range.split("-");
+                startByte = Long.parseLong(ranges[0]);
+                if (ranges.length > 1 && !ranges[1].isEmpty()) {
+                    endByte = Long.parseLong(ranges[1]);
+                }
+                contentLength = endByte - startByte + 1;
+                
+                // 返回206 Partial Content
+                response.setStatus(HttpServletResponse.SC_PARTIAL_CONTENT);
+                response.setHeader("Content-Range", 
+                    String.format("bytes %d-%d/%d", startByte, endByte, record.getFileSize()));
+                log.info("处理Range请求: {}-{}/{}", startByte, endByte, record.getFileSize());
+            } else {
+                response.setStatus(HttpServletResponse.SC_OK);
+            }
+            
             // 设置响应头
             response.setContentType(record.getContentType());
+            response.setHeader("Accept-Ranges", "bytes");  // 支持Range请求
+            response.setHeader("Content-Length", String.valueOf(contentLength));
             response.setHeader("Content-Disposition", 
                 "attachment; filename=" + URLEncoder.encode(record.getFileName(), "UTF-8"));
             
             // 下载文件并写入响应
-            try (InputStream inputStream = storageService.downloadFile(bucketName, record.getStoragePath());
+            try (InputStream inputStream = storageService.downloadFileRange(
+                        bucketName, record.getStoragePath(), startByte, endByte);
                  OutputStream outputStream = response.getOutputStream()) {
                 
                 byte[] buffer = new byte[8192];

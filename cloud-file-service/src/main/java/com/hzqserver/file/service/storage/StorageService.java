@@ -98,6 +98,16 @@ public interface StorageService {
     InputStream downloadFile(String bucketName, String objectName);
     
     /**
+     * 下载文件指定范围的数据（支持断点续传）
+     * @param bucketName 存储桶名称
+     * @param objectName 对象名称
+     * @param startByte 起始字节位置
+     * @param endByte 结束字节位置
+     * @return 文件输入流
+     */
+    InputStream downloadFileRange(String bucketName, String objectName, long startByte, long endByte);
+    
+    /**
      * 获取存储类型
      * @return 存储类型
      */

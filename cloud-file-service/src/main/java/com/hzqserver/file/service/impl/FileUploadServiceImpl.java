@@ -159,20 +159,74 @@ public class FileUploadServiceImpl implements FileUploadService {
                 throw new RuntimeException("分片文件不能为空");
             }
             
+            // 安全检查1: 防止重复上传同一分片
+            FileChunkRecord existingChunk = fileChunkRecordMapper.selectOne(
+                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<FileChunkRecord>()
+                    .eq(FileChunkRecord::getFileMd5, request.getFileMd5())
+                    .eq(FileChunkRecord::getChunkIndex, request.getChunkIndex())
+            );
+            
+            if (existingChunk != null) {
+                log.warn("分片已存在，跳过上传: fileMd5={}, chunkIndex={}", 
+                        request.getFileMd5(), request.getChunkIndex());
+                return FileUploadResponse.builder()
+                        .fileMd5(request.getFileMd5())
+                        .fileName(request.getFileName())
+                        .fileSize(request.getFileSize())
+                        .status(1)
+                        .message(String.format("分片 %d/%d 已存在，跳过上传", 
+                                request.getChunkIndex() + 1, request.getTotalChunks()))
+                        .build();
+            }
+            
             // 计算分片MD5
             String chunkMd5 = DigestUtil.md5Hex(file.getInputStream());
+            
+            // 安全检查2: 校验分片MD5（如果前端提供了chunkMd5）
             if (request.getChunkMd5() != null && !request.getChunkMd5().equals(chunkMd5)) {
-                throw new RuntimeException("分片MD5校验失败");
+                log.error("分片MD5校验失败: expected={}, actual={}, chunkIndex={}", 
+                        request.getChunkMd5(), chunkMd5, request.getChunkIndex());
+                throw new RuntimeException("分片MD5校验失败，文件可能被篡改");
             }
             
             // 生成分片存储路径
             String chunkObjectName = String.format("chunks/%s/%d", 
                     request.getFileMd5(), request.getChunkIndex());
             
-            // 上传分片到对象存储
+            // 检查对象存储中是否已存在该分片（双重保险）
             StorageService storageService = storageFactory.getStorageService();
             String bucketName = storageProperties.getDefaultBucket();
             
+            if (storageService.fileExists(bucketName, chunkObjectName)) {
+                log.warn("对象存储中分片已存在: {}", chunkObjectName);
+                // 虽然文件已存在，但仍需记录到数据库
+                FileChunkRecord chunkRecord = new FileChunkRecord();
+                chunkRecord.setFileMd5(request.getFileMd5());
+                chunkRecord.setChunkIndex(request.getChunkIndex());
+                chunkRecord.setChunkMd5(chunkMd5);
+                chunkRecord.setChunkSize(file.getSize());
+                chunkRecord.setStoragePath(chunkObjectName);
+                fileChunkRecordMapper.insert(chunkRecord);
+                
+                // 更新上传记录
+                FileUploadRecord record = fileUploadRecordMapper.selectByFileMd5(request.getFileMd5());
+                if (record != null) {
+                    record.setUploadedChunks(record.getUploadedChunks() + 1);
+                    record.setStatus(1);
+                    fileUploadRecordMapper.updateById(record);
+                }
+                
+                return FileUploadResponse.builder()
+                        .fileMd5(request.getFileMd5())
+                        .fileName(request.getFileName())
+                        .fileSize(request.getFileSize())
+                        .status(1)
+                        .message(String.format("分片 %d/%d 已存在", 
+                                request.getChunkIndex() + 1, request.getTotalChunks()))
+                        .build();
+            }
+            
+            // 上传分片到对象存储
             storageService.uploadFile(
                     bucketName,
                     chunkObjectName,
@@ -181,14 +235,35 @@ public class FileUploadServiceImpl implements FileUploadService {
                     "application/octet-stream"
             );
             
-            // 保存分片记录
-            FileChunkRecord chunkRecord = new FileChunkRecord();
-            chunkRecord.setFileMd5(request.getFileMd5());
-            chunkRecord.setChunkIndex(request.getChunkIndex());
-            chunkRecord.setChunkMd5(chunkMd5);
-            chunkRecord.setChunkSize(file.getSize());
-            chunkRecord.setStoragePath(chunkObjectName);
-            fileChunkRecordMapper.insert(chunkRecord);
+            // 保存分片记录（处理并发冲突）
+            try {
+                FileChunkRecord chunkRecord = new FileChunkRecord();
+                chunkRecord.setFileMd5(request.getFileMd5());
+                chunkRecord.setChunkIndex(request.getChunkIndex());
+                chunkRecord.setChunkMd5(chunkMd5);
+                chunkRecord.setChunkSize(file.getSize());
+                chunkRecord.setStoragePath(chunkObjectName);
+                fileChunkRecordMapper.insert(chunkRecord);
+                
+                log.info("分片记录保存成功: chunkIndex={}, md5={}", request.getChunkIndex(), chunkMd5);
+                
+            } catch (org.springframework.dao.DuplicateKeyException e) {
+                // 并发情况下可能出现的唯一索引冲突
+                log.warn("分片记录已存在（并发冲突）: fileMd5={}, chunkIndex={}", 
+                        request.getFileMd5(), request.getChunkIndex());
+                
+                // 查询已存在的记录
+                FileChunkRecord existingRecord = fileChunkRecordMapper.selectOne(
+                    new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<FileChunkRecord>()
+                        .eq(FileChunkRecord::getFileMd5, request.getFileMd5())
+                        .eq(FileChunkRecord::getChunkIndex, request.getChunkIndex())
+                );
+                
+                if (existingRecord != null) {
+                    log.info("使用已存在的分片记录: chunkIndex={}, md5={}", 
+                            request.getChunkIndex(), existingRecord.getChunkMd5());
+                }
+            }
             
             // 更新上传记录的已上传分片数
             FileUploadRecord record = fileUploadRecordMapper.selectByFileMd5(request.getFileMd5());
@@ -198,7 +273,7 @@ public class FileUploadServiceImpl implements FileUploadService {
                 fileUploadRecordMapper.updateById(record);
             }
             
-            log.info("分片上传成功: chunkIndex={}", request.getChunkIndex());
+            log.info("分片上传成功: chunkIndex={}, md5={}", request.getChunkIndex(), chunkMd5);
             
             return FileUploadResponse.builder()
                     .fileMd5(request.getFileMd5())
@@ -235,6 +310,37 @@ public class FileUploadServiceImpl implements FileUploadService {
             if (chunkRecords.size() != record.getTotalChunks()) {
                 throw new RuntimeException(String.format("分片不完整: 已上传 %d/%d", 
                         chunkRecords.size(), record.getTotalChunks()));
+            }
+            
+            // 安全检查3: 校验分片索引连续性（防止索引跳跃或重复）
+            List<Integer> chunkIndexes = chunkRecords.stream()
+                    .map(FileChunkRecord::getChunkIndex)
+                    .sorted()
+                    .collect(Collectors.toList());
+            
+            for (int i = 0; i < chunkIndexes.size(); i++) {
+                if (chunkIndexes.get(i) != i) {
+                    log.error("分片索引不连续: expected={}, actual={}, fileMd5={}", 
+                            i, chunkIndexes.get(i), fileMd5);
+                    throw new RuntimeException(String.format(
+                            "分片索引异常：期望索引 %d，实际索引 %d，可能存在数据篡改",
+                            i, chunkIndexes.get(i)));
+                }
+            }
+            
+            // 安全检查4: 校验分片大小合理性
+            long totalChunkSize = chunkRecords.stream()
+                    .mapToLong(FileChunkRecord::getChunkSize)
+                    .sum();
+            
+            // 最后一个分片可能小于标准分片大小，所以允许一定的误差
+            long sizeDiff = Math.abs(totalChunkSize - record.getFileSize());
+            if (sizeDiff > record.getChunkSize()) {
+                log.error("分片总大小与文件大小不匹配: totalChunkSize={}, fileSize={}, diff={}",
+                        totalChunkSize, record.getFileSize(), sizeDiff);
+                throw new RuntimeException(String.format(
+                        "分片总大小(%d)与文件大小(%d)不匹配，差异过大(%d)，可能存在数据损坏",
+                        totalChunkSize, record.getFileSize(), sizeDiff));
             }
             
             // 生成最终文件路径
@@ -283,7 +389,8 @@ public class FileUploadServiceImpl implements FileUploadService {
             // 删除分片记录
             fileChunkRecordMapper.deleteByFileMd5(fileMd5);
             
-            log.info("文件合并成功: fileMd5={}, objectName={}", fileMd5, objectName);
+            log.info("文件合并成功: fileMd5={}, objectName={}, totalChunks={}", 
+                    fileMd5, objectName, chunkRecords.size());
             
             return FileUploadResponse.builder()
                     .fileId(record.getId())

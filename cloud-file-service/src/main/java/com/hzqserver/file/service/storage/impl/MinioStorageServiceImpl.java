@@ -83,12 +83,38 @@ public class MinioStorageServiceImpl implements StorageService {
                     .map(DeleteObject::new)
                     .collect(Collectors.toList());
             
-            minioClient.removeObjects(
+            // 执行批量删除，并遍历结果处理错误
+            Iterable<Result<io.minio.messages.DeleteError>> results = minioClient.removeObjects(
                     RemoveObjectsArgs.builder()
                             .bucket(bucketName)
                             .objects(objects)
                             .build()
             );
+            
+            // 遍历删除结果，检查是否有错误 只有执行了这个遍历才能真正删除
+            int successCount = 0;
+            int errorCount = 0;
+            for (Result<io.minio.messages.DeleteError> result : results) {
+                io.minio.messages.DeleteError error = result.get();
+                if (error != null) {
+                    log.error("MinIO删除文件失败: object={}, code={}, message={}", 
+                            error.objectName(), error.code(), error.message());
+                    errorCount++;
+                } else {
+                    successCount++;
+                }
+            }
+            
+            log.info("MinIO批量删除完成: 成功={}, 失败={}, 总计={}", 
+                    successCount, errorCount, objectNames.size());
+            
+            // 如果有删除失败的，抛出异常
+            if (errorCount > 0) {
+                throw new RuntimeException(String.format(
+                        "MinIO批量删除部分失败: 成功%d个, 失败%d个", 
+                        successCount, errorCount));
+            }
+            
         } catch (Exception e) {
             log.error("MinIO批量文件删除失败", e);
             throw new RuntimeException("MinIO批量文件删除失败: " + e.getMessage(), e);
@@ -180,6 +206,27 @@ public class MinioStorageServiceImpl implements StorageService {
         } catch (Exception e) {
             log.error("MinIO文件下载失败", e);
             throw new RuntimeException("MinIO文件下载失败: " + e.getMessage(), e);
+        }
+    }
+    
+    @Override
+    public InputStream downloadFileRange(String bucketName, String objectName, long startByte, long endByte) {
+        try {
+            log.info("MinIO范围下载文件: bucket={}, object={}, range={}-{}", bucketName, objectName, startByte, endByte);
+            
+            // MinIO支持通过offset和length参数实现Range请求
+            long length = endByte - startByte + 1;
+            return minioClient.getObject(
+                    GetObjectArgs.builder()
+                            .bucket(bucketName)
+                            .object(objectName)
+                            .offset(startByte)
+                            .length(length)
+                            .build()
+            );
+        } catch (Exception e) {
+            log.error("MinIO范围下载文件失败", e);
+            throw new RuntimeException("MinIO范围下载文件失败: " + e.getMessage(), e);
         }
     }
     

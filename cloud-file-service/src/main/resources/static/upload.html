@@ -404,14 +404,24 @@
                                     >
                                         取消
                                     </el-button>
-                                    <a 
-                                        :href="`${API_BASE_URL}/download/${file.fileMd5}`" 
-                                        target="_blank"
-                                        class="download-btn"
-                                        v-if="file.status === 'completed'"
-                                    >
-                                        📥 下载文件
-                                    </a>
+                                    <div class="download-buttons" v-if="file.status === 'completed'">
+                                        <a 
+                                            href="#"
+                                            @click.prevent="downloadFileWithResume(file)"
+                                            class="download-btn download-btn-resume"
+                                            title="支持断点续传、多线程下载、速度限制"
+                                        >
+                                            🚀 分片下载（推荐）
+                                        </a>
+                                        <a 
+                                            :href="`${API_BASE_URL}/download/${file.fileMd5}`" 
+                                            target="_blank"
+                                            class="download-btn download-btn-direct"
+                                            title="浏览器默认下载方式"
+                                        >
+                                            ⬇️ 直接下载
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -468,8 +478,8 @@
                                 </div>
                                 <div style="margin-top: 8px;">
                                     <a 
-                                        :href="`${API_BASE_URL}/download/${item.fileMd5}`" 
-                                        target="_blank"
+                                        href="#"
+                                        @click.prevent="downloadHistoryFile(item)"
                                         class="download-btn"
                                     >
                                         📥 下载文件
@@ -493,6 +503,10 @@
         const { createApp, ref, computed, onMounted } = Vue;
         
         const CHUNK_SIZE = 5 * 1024 * 1024; // 5MB
+        const DOWNLOAD_CONCURRENCY = 3; // 并发下载线程数
+        const DOWNLOAD_CHUNK_SIZE = 2 * 1024 * 1024; // 下载分片大小: 2MB
+        const DOWNLOAD_SPEED_LIMIT = 10 * 1024 * 1024; // 下载速度限制: 10MB/s
+        const MAX_RETRY_COUNT = 3; // 最大重试次数
         
         createApp({
             setup() {
@@ -783,6 +797,287 @@
                     }
                 };
                 
+                // 分片下载文件（支持断点续传、多线程、速度限制、自动重试）
+                const downloadFileWithResume = async (file) => {
+                    const storageKey = `download_${file.fileMd5}`;
+                    let progressMsg = null;
+                    
+                    try {
+                        ElementPlus.ElMessage.info('开始下载: ' + file.name);
+                        
+                        // 从 IndexedDB 或 localStorage 获取已下载进度
+                        const downloadedData = await getDownloadProgress(file.fileMd5);
+                        const downloadedChunks = downloadedData.chunks || {};
+                        const totalDownloadedBytes = Object.values(downloadedChunks).reduce((sum, chunk) => sum + (chunk.size || 0), 0);
+                        
+                        // 计算总分片数
+                        const totalChunks = Math.ceil(file.size / DOWNLOAD_CHUNK_SIZE);
+                        
+                        // 显示下载进度
+                        progressMsg = ElementPlus.ElNotification({
+                            title: '下载中',
+                            message: `${file.name}<br/>进度: 0%`,
+                            type: 'info',
+                            duration: 0,
+                            dangerouslyUseHTMLString: true
+                        });
+                        
+                        // 如果所有分片都已下载，直接合并
+                        if (Object.keys(downloadedChunks).length === totalChunks) {
+                            await mergeAndDownloadChunks(file, downloadedChunks, progressMsg);
+                            return;
+                        }
+                        
+                        // 多线程并发下载
+                        await downloadWithConcurrency(file, downloadedChunks, totalChunks, progressMsg);
+                        
+                        // 合并所有分片并下载
+                        const finalData = await getDownloadProgress(file.fileMd5);
+                        await mergeAndDownloadChunks(file, finalData.chunks, progressMsg);
+                        
+                    } catch (error) {
+                        console.error('下载失败:', error);
+                        ElementPlus.ElMessage.error('下载失败: ' + error.message);
+                        if (progressMsg) {
+                            progressMsg.close();
+                        }
+                    }
+                };
+                
+                // 使用 IndexedDB 存储下载进度（支持大文件）
+                const initIndexedDB = () => {
+                    return new Promise((resolve, reject) => {
+                        const request = indexedDB.open('FileDownloadDB', 1);
+                        
+                        request.onerror = () => reject(request.error);
+                        request.onsuccess = () => resolve(request.result);
+                        
+                        request.onupgradeneeded = (event) => {
+                            const db = event.target.result;
+                            if (!db.objectStoreNames.contains('downloads')) {
+                                db.createObjectStore('downloads', { keyPath: 'fileMd5' });
+                            }
+                        };
+                    });
+                };
+                
+                const saveDownloadProgress = async (fileMd5, chunkIndex, chunkData, chunkSize) => {
+                    try {
+                        const db = await initIndexedDB();
+                        const transaction = db.transaction(['downloads'], 'readwrite');
+                        const store = transaction.objectStore('downloads');
+                        
+                        const getRequest = store.get(fileMd5);
+                        getRequest.onsuccess = () => {
+                            let data = getRequest.result || { fileMd5, chunks: {}, timestamp: Date.now() };
+                            data.chunks[chunkIndex] = { data: chunkData, size: chunkSize };
+                            data.timestamp = Date.now();
+                            store.put(data);
+                        };
+                    } catch (error) {
+                        // 降级到 localStorage（仅保存元数据）
+                        console.warn('IndexedDB 保存失败，降级到 localStorage:', error);
+                        const metadata = JSON.parse(localStorage.getItem(`download_meta_${fileMd5}`) || '{}');
+                        metadata[chunkIndex] = { size: chunkSize };
+                        localStorage.setItem(`download_meta_${fileMd5}`, JSON.stringify(metadata));
+                    }
+                };
+                
+                const getDownloadProgress = async (fileMd5) => {
+                    try {
+                        const db = await initIndexedDB();
+                        const transaction = db.transaction(['downloads'], 'readonly');
+                        const store = transaction.objectStore('downloads');
+                        
+                        return new Promise((resolve) => {
+                            const request = store.get(fileMd5);
+                            request.onsuccess = () => {
+                                resolve(request.result || { fileMd5, chunks: {}, timestamp: Date.now() });
+                            };
+                            request.onerror = () => resolve({ fileMd5, chunks: {}, timestamp: Date.now() });
+                        });
+                    } catch (error) {
+                        // 降级到 localStorage
+                        console.warn('IndexedDB 读取失败，降级到 localStorage:', error);
+                        return { fileMd5, chunks: {}, timestamp: Date.now() };
+                    }
+                };
+                
+                const clearDownloadProgress = async (fileMd5) => {
+                    try {
+                        const db = await initIndexedDB();
+                        const transaction = db.transaction(['downloads'], 'readwrite');
+                        const store = transaction.objectStore('downloads');
+                        store.delete(fileMd5);
+                    } catch (error) {
+                        console.warn('清理下载进度失败:', error);
+                    }
+                    localStorage.removeItem(`download_meta_${fileMd5}`);
+                };
+                
+                // 带速度限制的下载函数
+                const downloadWithSpeedLimit = async (url, startByte, endByte, retryCount = 0) => {
+                    try {
+                        const response = await fetch(url, {
+                            headers: {
+                                'Range': `bytes=${startByte}-${endByte}`
+                            }
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                        }
+                        
+                        const reader = response.body.getReader();
+                        const chunks = [];
+                        let receivedBytes = 0;
+                        const startTime = Date.now();
+                        
+                        while (true) {
+                            const { done, value } = await reader.read();
+                            
+                            if (done) break;
+                            
+                            chunks.push(value);
+                            receivedBytes += value.length;
+                            
+                            // 速度限制：计算当前速度，如果超过限制则等待
+                            const elapsed = (Date.now() - startTime) / 1000; // 秒
+                            const currentSpeed = receivedBytes / elapsed; // 字节/秒
+                            
+                            if (currentSpeed > DOWNLOAD_SPEED_LIMIT) {
+                                // 计算需要等待的时间
+                                const expectedTime = receivedBytes / DOWNLOAD_SPEED_LIMIT;
+                                const waitTime = (expectedTime - elapsed) * 1000;
+                                if (waitTime > 0) {
+                                    await new Promise(resolve => setTimeout(resolve, waitTime));
+                                }
+                            }
+                        }
+                        
+                        // 合并chunks
+                        const blob = new Blob(chunks);
+                        return await blob.arrayBuffer();
+                        
+                    } catch (error) {
+                        // 自动重试机制
+                        if (retryCount < MAX_RETRY_COUNT) {
+                            console.warn(`下载失败，重试 ${retryCount + 1}/${MAX_RETRY_COUNT}:`, error);
+                            await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))); // 指数退避
+                            return downloadWithSpeedLimit(url, startByte, endByte, retryCount + 1);
+                        }
+                        throw error;
+                    }
+                };
+                
+                // 多线程并发下载
+                const downloadWithConcurrency = async (file, downloadedChunks, totalChunks, progressMsg) => {
+                    const baseUrl = `${API_BASE_URL}/download/${file.fileMd5}`; // GET方式，fileMd5在URL中
+                    
+                    // 创建下载任务队列
+                    const tasks = [];
+                    for (let i = 0; i < totalChunks; i++) {
+                        if (!downloadedChunks[i]) {
+                            const startByte = i * DOWNLOAD_CHUNK_SIZE;
+                            const endByte = Math.min(startByte + DOWNLOAD_CHUNK_SIZE - 1, file.size - 1);
+                            tasks.push({ index: i, startByte, endByte });
+                        }
+                    }
+                    
+                    // 并发执行下载任务
+                    let completedTasks = 0;
+                    const totalTasks = tasks.length;
+                    
+                    const worker = async () => {
+                        while (tasks.length > 0) {
+                            const task = tasks.shift();
+                            if (!task) break;
+                            
+                            try {
+                                const chunkData = await downloadWithSpeedLimit(
+                                    baseUrl,
+                                    task.startByte,
+                                    task.endByte
+                                );
+                                
+                                // 保存分片数据
+                                await saveDownloadProgress(
+                                    file.fileMd5,
+                                    task.index,
+                                    chunkData,
+                                    chunkData.byteLength
+                                );
+                                
+                                completedTasks++;
+                                
+                                // 更新进度
+                                const totalCompleted = Object.keys(downloadedChunks).length + completedTasks;
+                                const progress = ((totalCompleted / totalChunks) * 100).toFixed(2);
+                                if (progressMsg) {
+                                    progressMsg.message = `${file.name}<br/>进度: ${progress}% (${totalCompleted}/${totalChunks} 分片)`;
+                                }
+                                
+                            } catch (error) {
+                                console.error(`分片 ${task.index} 下载失败:`, error);
+                                throw error;
+                            }
+                        }
+                    };
+                    
+                    // 启动多个工作线程
+                    const workers = Array(Math.min(DOWNLOAD_CONCURRENCY, tasks.length))
+                        .fill(null)
+                        .map(() => worker());
+                    
+                    await Promise.all(workers);
+                };
+                
+                // 合并分片并触发下载
+                const mergeAndDownloadChunks = async (file, chunks, progressMsg) => {
+                    // 按索引排序分片
+                    const sortedIndexes = Object.keys(chunks).map(Number).sort((a, b) => a - b);
+                    
+                    // 合并所有分片
+                    const blobs = sortedIndexes.map(index => {
+                        const chunk = chunks[index];
+                        return new Blob([chunk.data]);
+                    });
+                    
+                    const finalBlob = new Blob(blobs, { 
+                        type: file.file?.type || 'application/octet-stream' 
+                    });
+                    
+                    const url = URL.createObjectURL(finalBlob);
+                    
+                    // 触发下载
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = file.name;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    
+                    // 清理
+                    await clearDownloadProgress(file.fileMd5);
+                    URL.revokeObjectURL(url);
+                    
+                    if (progressMsg) {
+                        progressMsg.close();
+                    }
+                    ElementPlus.ElMessage.success('下载完成！');
+                };
+                
+                // 下载历史文件
+                const downloadHistoryFile = async (item) => {
+                    // 构造文件对象
+                    const file = {
+                        name: item.fileName,
+                        size: item.fileSize,
+                        fileMd5: item.fileMd5
+                    };
+                    await downloadFileWithResume(file);
+                };
+                
                 // 格式化时间
                 const formatTime = (timeStr) => {
                     if (!timeStr) return '';
@@ -858,6 +1153,8 @@
                     cancelUpload,
                     viewFile,
                     loadHistory,
+                    downloadFileWithResume,
+                    downloadHistoryFile,
                     formatFileSize,
                     formatTime,
                     getStatusClass,

@@ -230,6 +230,28 @@ public class OssStorageServiceImpl implements StorageService {
     }
     
     @Override
+    public InputStream downloadFileRange(String bucketName, String objectName, long startByte, long endByte) {
+        OSS ossClient = createOssClient();
+        try {
+            log.info("OSS范围下载文件: bucket={}, object={}, range={}-{}", bucketName, objectName, startByte, endByte);
+            
+            // 创建GetObjectRequest并设置Range
+            GetObjectRequest getObjectRequest = new GetObjectRequest(bucketName, objectName);
+            getObjectRequest.setRange(startByte, endByte);
+            
+            // 获取指定范围的数据
+            OSSObject ossObject = ossClient.getObject(getObjectRequest);
+            return ossObject.getObjectContent();
+        } catch (Exception e) {
+            log.error("OSS范围下载文件失败", e);
+            throw new RuntimeException("OSS范围下载文件失败: " + e.getMessage(), e);
+        } finally {
+            // 注意：这里不能关闭ossClient，因为返回的InputStream依赖于它
+            // 调用方需要负责关闭InputStream和ossClient
+        }
+    }
+    
+    @Override
     public String getStorageType() {
         return "oss";
     }
